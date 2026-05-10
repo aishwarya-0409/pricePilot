@@ -72,7 +72,8 @@ During this build, we tackled several hard engineering challenges:
 - **Premium UX:** Crafting a "Glassmorphic" UI that feels like a high-tech radar system rather than a generic e-commerce site.
 
 ---
-*Built for smarter shopping. *
+*Built for smarter shopping.*
+
 *Aishwarya Rangu*
 
 
