@@ -45,7 +45,6 @@ A side-by-side comparison of Amazon, Flipkart, Myntra, and Meesho, paired with o
 
 ### 3. The AI Verdict
 A focused view of the Smart Advice panel showing the AI's recommendation, certainty score, and logical reasoning.
-![AI Advice](assets/ai_advice.png)
 
 ---
 
