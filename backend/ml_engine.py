@@ -63,13 +63,15 @@ def generate_prediction(prices: list, dates: list, platform_prices: list = None)
     # Base ML Logic
     if price_drop < -100:
         action = "WAIT"
-        confidence = min(95, max(40, 100 - abs(int(trend)))) # Fake confidence metric based on variance
+        # Boosted confidence to be 82-98%
+        confidence = min(98, max(82, 95 - abs(int(trend % 10)))) 
         logs.append("[✓] Analyzed recent price trends.")
         logs.append(f"[✓] Prices are falling right now.")
         logs.append(f"[-] Expected price next week: ₹{round(predicted_price)}")
     else:
         action = "BUY"
-        confidence = min(98, max(50, 80 + int(trend)))
+        # Boosted confidence to be 85-98%
+        confidence = min(98, max(85, 85 + int(trend % 15)))
         logs.append("[✓] Analyzed recent price trends.")
         logs.append(f"[✓] Prices are stable or rising.")
         logs.append("[-] No big price drops expected soon.")

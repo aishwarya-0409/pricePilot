@@ -31,8 +31,9 @@ def scrape_new_product(request: ScrapeRequest, db: Session = Depends(get_db)):
     if not scraped_data_list:
         raise HTTPException(status_code=500, detail="Failed to find product data.")
         
-    # Find the lowest price to represent the main tracking price
-    best_deal = min(scraped_data_list, key=lambda x: x["price"])
+    # Find the lowest AVAILABLE price to represent the main tracking price
+    available_deals = [d for d in scraped_data_list if d.get("is_available", True)]
+    best_deal = min(available_deals, key=lambda x: x["price"]) if available_deals else scraped_data_list[0]
     product_name = best_deal["title"]
     
     # 2. Check if we already scraped this name
@@ -49,20 +50,39 @@ def scrape_new_product(request: ScrapeRequest, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(product)
         
-        # Backfill 30 days of fake history leading up to today
-        real_price = best_deal["price"]
+        # Backfill 30 days of fake history leading up to today for ALL platforms
         now = datetime.utcnow()
         history = []
-        for i in range(30, -1, -1):
-            date = now - timedelta(days=i)
-            price = real_price if i == 0 else real_price + random.randint(-5000, 5000)
-            history.append(PriceHistory(product_id=product.id, price=price, timestamp=date))
+        platforms = ["Amazon", "Flipkart", "Myntra", "Meesho"]
+        
+        for platform in platforms:
+            # Check if this platform was actually found or is just a mock
+            is_found = any(d["platform"] == platform and d.get("is_available", True) for d in scraped_data_list)
+            if not is_found: continue
+
+            # Get the current price for this platform to use as base for backfill
+            matching_deal = next((d for d in scraped_data_list if d["platform"] == platform), None)
+            real_price = matching_deal["price"] if matching_deal else 1000
+            
+            for i in range(15, -1, -1): # Reduce to 15 days to keep chart clean
+                date = now - timedelta(days=i)
+                # Add some variance per platform
+                price = real_price if i == 0 else real_price + random.randint(-2000, 2000)
+                history.append(PriceHistory(product_id=product.id, platform_name=platform, price=price, timestamp=date))
         
         db.add_all(history)
         db.commit()
     else:
-        new_price = PriceHistory(product_id=product.id, price=best_deal["price"], timestamp=datetime.utcnow())
-        db.add(new_price)
+        # Update current history for all available platforms
+        for data in scraped_data_list:
+            if data.get("is_available", True):
+                new_price = PriceHistory(
+                    product_id=product.id, 
+                    platform_name=data["platform"], 
+                    price=data["price"], 
+                    timestamp=datetime.utcnow()
+                )
+                db.add(new_price)
         db.commit()
 
     # 3. Update Platform Prices
@@ -136,14 +156,18 @@ def get_product(product_id: int, db: Session = Depends(get_db)):
 # --- Route 3: Get Price History ---
 @router.get("/{product_id}/prices")
 def get_price_history(product_id: int, db: Session = Depends(get_db)):
-    prices = db.query(PriceHistory).filter(PriceHistory.product_id == product_id).order_by(PriceHistory.timestamp.asc()).all()
+    # Group prices by timestamp to make it easier for the frontend to draw multiple lines
+    history = db.query(PriceHistory).filter(PriceHistory.product_id == product_id).order_by(PriceHistory.timestamp.asc()).all()
     
-    return [
-        {
-            "price": p.price,
-            "date": p.timestamp.strftime("%Y-%m-%d %H:%M")
-        } for p in prices
-    ]
+    # We want a list of { date, Amazon: 100, Flipkart: 110, ... }
+    grouped_data = {}
+    for p in history:
+        date_str = p.timestamp.strftime("%Y-%m-%d %H:%M")
+        if date_str not in grouped_data:
+            grouped_data[date_str] = {"date": date_str}
+        grouped_data[date_str][p.platform_name] = p.price
+        
+    return list(grouped_data.values())
 
 # --- Route 4: The AI Recommendation Engine (Scikit-Learn Integration) ---
 @router.get("/{product_id}/recommend")
@@ -155,7 +179,11 @@ def get_recommendation(product_id: int, db: Session = Depends(get_db)):
     dates = [p.timestamp for p in history]
     
     # Run the Scikit-Learn Linear Regression!
-    platform_prices = db.query(PlatformPrice).filter(PlatformPrice.product_id == product_id).all()
+    # IMPORTANT: Only analyze platforms that are actually available live!
+    platform_prices = db.query(PlatformPrice).filter(
+        PlatformPrice.product_id == product_id, 
+        PlatformPrice.is_available == True
+    ).all()
     platform_data = [{"platform": p.platform_name, "price": p.price} for p in platform_prices]
     prediction_data = generate_prediction(prices, dates, platform_prices=platform_data)
     

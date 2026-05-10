@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Activity, ArrowLeft, ArrowRight, ThermometerSun, CloudLightning, ShieldAlert, Zap, Clock, CheckCircle2, AlertTriangle, TrendingDown } from "lucide-react";
 import axios from "axios";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 
 export default function ProductPage() {
   const { id } = useParams();
@@ -26,22 +26,7 @@ export default function ProductPage() {
         ]);
 
         setProduct(prodRes.data);
-        
-        // Append the future predicted data point so Recharts draws the dashed line!
-        const fullData = [...priceRes.data];
-        if (recRes.data.future_data_point) {
-           fullData.push({
-             date: recRes.data.future_data_point.date,
-             future_price: recRes.data.future_data_point.predicted_price,
-             // To connect the solid line to the dashed line seamlessly, 
-             // we need the last known price to also have a 'future_price' value
-           });
-           
-           // Connect the gap
-           fullData[fullData.length - 2].future_price = fullData[fullData.length - 2].price;
-        }
-
-        setPrices(fullData);
+        setPrices(priceRes.data);
         setRecommendation(recRes.data);
       } catch (err) {
         console.error(err);
@@ -119,14 +104,16 @@ export default function ProductPage() {
               </h3>
               <div className="flex flex-col gap-3">
                 {product.competitors.map((comp: any, idx: number) => (
-                  <a key={idx} href={comp.url} target="_blank" rel="noopener noreferrer" className={`flex items-center justify-between p-3 bg-black/40 rounded-xl border ${comp.is_available ? 'border-gray-800 hover:border-[var(--color-radar-accent)]' : 'border-red-900/30 opacity-60 hover:border-red-500'} transition-colors group`}>
+                  <a key={idx} href={comp.url} target="_blank" rel="noopener noreferrer" className={`flex items-center justify-between p-3 bg-black/40 rounded-xl border ${comp.is_available ? 'border-gray-800 hover:border-[var(--color-radar-accent)]' : 'border-red-900/10 opacity-40 hover:border-red-500'} transition-colors group`}>
                     <div className="flex flex-col">
                       <span className="font-medium text-gray-300 group-hover:text-white transition-colors">{comp.platform}</span>
-                      {!comp.is_available && <span className="text-[10px] text-red-500 font-mono uppercase">Not Found Live</span>}
+                      {!comp.is_available && <span className="text-[10px] text-red-500 font-mono uppercase">Not Found</span>}
                     </div>
-                    <span className={`font-mono ${comp.is_available ? 'text-[var(--color-radar-accent)]' : 'text-gray-500 line-through'}`}>
-                      ₹{comp.price.toLocaleString()}
-                    </span>
+                    {comp.is_available ? (
+                      <span className="font-mono text-[var(--color-radar-accent)]">₹{comp.price.toLocaleString()}</span>
+                    ) : (
+                      <span className="font-mono text-gray-700">N/A</span>
+                    )}
                   </a>
                 ))}
               </div>
@@ -158,27 +145,24 @@ export default function ProductPage() {
               </div>
             </div>
 
-            {/* Recharts Implementation */}
+            {/* Multi-Platform Line Chart */}
             <div className="w-full h-[400px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={prices} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={accentColor} stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor={accentColor} stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
+                <LineChart data={prices} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#222" vertical={false} />
                   <XAxis dataKey="date" hide />
-                  <YAxis domain={['dataMin - 5000', 'dataMax + 5000']} stroke="#333" tick={{fill: '#666', fontSize: 12}} />
+                  <YAxis domain={['auto', 'auto']} stroke="#333" tick={{fill: '#666', fontSize: 10}} />
                   <Tooltip 
-                    contentStyle={{ backgroundColor: '#111', borderColor: '#333', borderRadius: '8px' }}
-                    itemStyle={{ color: '#fff' }}
+                    contentStyle={{ backgroundColor: '#111', borderColor: '#333', borderRadius: '12px' }}
+                    itemStyle={{ fontSize: '12px' }}
                   />
-                  {/* Historical Solid Line */}
-                  <Area type="monotone" dataKey="price" stroke={accentColor} strokeWidth={3} fillOpacity={1} fill="url(#colorPrice)" />
-                  {/* Future Prediction Dashed Line */}
-                  <Area type="monotone" dataKey="future_price" stroke={accentColor} strokeWidth={3} strokeDasharray="5 5" fill="none" />
-                </AreaChart>
+                  <Legend iconType="circle" wrapperStyle={{ paddingTop: "20px" }} />
+                  
+                  <Line type="monotone" dataKey="Amazon" stroke="#FF9900" strokeWidth={3} dot={false} activeDot={{ r: 6 }} connectNulls />
+                  <Line type="monotone" dataKey="Flipkart" stroke="#2874F0" strokeWidth={3} dot={false} activeDot={{ r: 6 }} connectNulls />
+                  <Line type="monotone" dataKey="Myntra" stroke="#FF3F6C" strokeWidth={3} dot={false} activeDot={{ r: 6 }} connectNulls />
+                  <Line type="monotone" dataKey="Meesho" stroke="#F43397" strokeWidth={3} dot={false} activeDot={{ r: 6 }} connectNulls />
+                </LineChart>
               </ResponsiveContainer>
             </div>
 
