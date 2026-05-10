@@ -51,6 +51,7 @@ class PriceHistory(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    platform_name = Column(String, nullable=True) # Which app was this price from?
     price = Column(Float, nullable=False)
     timestamp = Column(DateTime, default=datetime.utcnow)
     
@@ -65,6 +66,7 @@ class PlatformPrice(Base):
     platform_name = Column(String, nullable=False)
     price = Column(Float, nullable=False)
     url = Column(String, nullable=False)
+    is_available = Column(Boolean, default=True)
     last_updated = Column(DateTime, default=datetime.utcnow)
     
     product = relationship("Product", back_populates="competitor_prices")

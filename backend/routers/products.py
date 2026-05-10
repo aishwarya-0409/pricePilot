@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from pydantic import BaseModel
@@ -6,7 +6,7 @@ import random
 
 from database import get_db
 from models import Product, PriceHistory, PlatformPrice
-from scraper import scrape_across_platforms
+from scraper import scrape_across_platforms, get_product_title_from_url
 from ml_engine import generate_prediction
 
 router = APIRouter(prefix="/api/products", tags=["Products & Predictions"])
@@ -17,8 +17,16 @@ class ScrapeRequest(BaseModel):
 # --- Route 1: Scrape & Save (The Bridge between Real World and our App) ---
 @router.post("/scrape")
 def scrape_new_product(request: ScrapeRequest, db: Session = Depends(get_db)):
+    query = request.query
+    
+    # 0. Check if the query is a direct URL
+    if query.startswith("http"):
+        # Visit the URL and extract the product title first
+        query = get_product_title_from_url(query)
+        print(f"[*] Parsed title from URL: {query}")
+
     # 1. Scrape the live data across platforms
-    scraped_data_list = scrape_across_platforms(request.query)
+    scraped_data_list = scrape_across_platforms(query)
     
     if not scraped_data_list:
         raise HTTPException(status_code=500, detail="Failed to find product data.")
@@ -68,13 +76,41 @@ def scrape_new_product(request: ScrapeRequest, db: Session = Depends(get_db)):
                 product_id=product.id,
                 platform_name=data["platform"],
                 price=data["price"],
-                url=data["url"]
+                url=data["url"],
+                is_available=data.get("is_available", True)
             )
         )
     db.add_all(platform_prices)
     db.commit()
 
     return {"message": "Scraped successfully", "product_id": product.id}
+
+# --- Route 5: Mock AI Vision Engine ---
+@router.post("/identify-image")
+async def identify_image(file: UploadFile = File(...)):
+    # In a real app, we'd use Gemini Vision or GPT-4V here.
+    # For now, we simulate identification based on the filename or a random selection.
+    filename = file.filename.lower()
+    
+    # Simple keyword detection for "Mocking"
+    if "iphone" in filename or "phone" in filename:
+        product_name = "iPhone 16 Pro"
+    elif "samsung" in filename or "galaxy" in filename:
+        product_name = "Samsung Galaxy S24 Ultra"
+    elif "macbook" in filename or "laptop" in filename:
+        product_name = "MacBook Air M3"
+    elif "shoe" in filename or "nike" in filename or "adidas" in filename:
+        product_name = "Nike Air Max Shoes"
+    elif "shirt" in filename or "dress" in filename or "top" in filename:
+        product_name = "Cotton Casual Wear"
+    elif "watch" in filename:
+        product_name = "Smart Watch Series 9"
+    else:
+        # Random fashion items if no keyword found
+        fashion_items = ["Floral Summer Dress", "Men's Slim Fit Jeans", "Leather Handbag", "Wireless Headphones"]
+        product_name = random.choice(fashion_items)
+        
+    return {"product_name": product_name}
 
 
 # --- Route 2: Get Product Details ---
@@ -94,7 +130,7 @@ def get_product(product_id: int, db: Session = Depends(get_db)):
         "market_weather": product.market_weather,
         "market_mood": product.market_mood,
         "current_price": latest_price.price if latest_price else 0,
-        "competitors": [{"platform": p.platform_name, "price": p.price, "url": p.url} for p in platform_prices]
+        "competitors": [{"platform": p.platform_name, "price": p.price, "url": p.url, "is_available": p.is_available} for p in platform_prices]
     }
 
 # --- Route 3: Get Price History ---

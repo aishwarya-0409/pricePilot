@@ -119,9 +119,14 @@ export default function ProductPage() {
               </h3>
               <div className="flex flex-col gap-3">
                 {product.competitors.map((comp: any, idx: number) => (
-                  <a key={idx} href={comp.url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-3 bg-black/40 rounded-xl border border-gray-800 hover:border-[var(--color-radar-accent)] transition-colors group">
-                    <span className="font-medium text-gray-300 group-hover:text-white transition-colors">{comp.platform}</span>
-                    <span className="font-mono text-[var(--color-radar-accent)]">₹{comp.price.toLocaleString()}</span>
+                  <a key={idx} href={comp.url} target="_blank" rel="noopener noreferrer" className={`flex items-center justify-between p-3 bg-black/40 rounded-xl border ${comp.is_available ? 'border-gray-800 hover:border-[var(--color-radar-accent)]' : 'border-red-900/30 opacity-60 hover:border-red-500'} transition-colors group`}>
+                    <div className="flex flex-col">
+                      <span className="font-medium text-gray-300 group-hover:text-white transition-colors">{comp.platform}</span>
+                      {!comp.is_available && <span className="text-[10px] text-red-500 font-mono uppercase">Not Found Live</span>}
+                    </div>
+                    <span className={`font-mono ${comp.is_available ? 'text-[var(--color-radar-accent)]' : 'text-gray-500 line-through'}`}>
+                      ₹{comp.price.toLocaleString()}
+                    </span>
                   </a>
                 ))}
               </div>

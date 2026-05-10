@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Activity, Zap, Loader2 } from "lucide-react";
+import { Search, Activity, Zap, Loader2, Camera, Image } from "lucide-react";
 import axios from "axios";
 import LoginModal from "@/components/LoginModal";
 
@@ -12,30 +12,54 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isScanning, setIsScanning] = useState(false);
   const [loadingText, setLoadingText] = useState("Scanning...");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleScan = async () => {
-    if (!searchQuery) return;
+  const handleScan = async (queryToUse?: string) => {
+    const query = queryToUse || searchQuery;
+    if (!query) return;
     
     setIsScanning(true);
     setLoadingText("Scanning Amazon...");
     
     // Simulate intelligent loading states
-    setTimeout(() => setLoadingText("Scanning Flipkart..."), 3000);
-    setTimeout(() => setLoadingText("Comparing prices..."), 6000);
-    setTimeout(() => setLoadingText("Finding best deal..."), 9000);
+    setTimeout(() => setLoadingText("Scanning Flipkart..."), 2500);
+    setTimeout(() => setLoadingText("Scanning Myntra..."), 5000);
+    setTimeout(() => setLoadingText("Scanning Meesho..."), 7500);
+    setTimeout(() => setLoadingText("Comparing all prices..."), 10000);
 
     try {
-      // Send the query to our new Python Scraper!
       const response = await axios.post("http://localhost:8000/api/products/scrape", {
-        query: searchQuery
+        query: query
       });
       
-      // Navigate to the newly created product's Mission Control page
       if (response.data.product_id) {
         router.push(`/product/${response.data.product_id}`);
       }
     } catch (err) {
       console.error("Scraping failed", err);
+      setIsScanning(false);
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsScanning(true);
+    setLoadingText("Analyzing Image...");
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const idResponse = await axios.post("http://localhost:8000/api/products/identify-image", formData);
+      const productName = idResponse.data.product_name;
+      setSearchQuery(productName);
+      
+      // Now trigger the actual scan with the identified name
+      await handleScan(productName);
+    } catch (err) {
+      console.error("Image analysis failed", err);
       setIsScanning(false);
     }
   };
@@ -87,15 +111,34 @@ export default function Home() {
             </div>
             <input
               type="text"
-              placeholder="e.g. iPhone 16 Pro Max, Sony WH-1000XM5..."
+              placeholder="Enter product or paste link (Amazon, Myntra...)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleScan()}
               className="w-full py-5 pr-6 bg-transparent text-lg text-white placeholder-gray-600 focus:outline-none"
             />
+            
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleImageUpload} 
+              className="hidden" 
+              accept="image/*" 
+            />
+
             <button 
-              onClick={handleScan}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isScanning}
+              className="p-3 text-gray-500 hover:text-[var(--color-radar-accent)] transition-colors"
+              title="Search by image"
+            >
+              <Camera className="w-6 h-6" />
+            </button>
+
+            <button 
+              onClick={() => handleScan()}
               disabled={isScanning || !searchQuery}
-              className="absolute right-3 px-4 py-2.5 bg-white text-black font-semibold rounded-xl hover:bg-gray-200 disabled:opacity-50 transition-colors flex items-center gap-2"
+              className="mr-3 px-4 py-2.5 bg-white text-black font-semibold rounded-xl hover:bg-gray-200 disabled:opacity-50 transition-colors flex items-center gap-2"
             >
               {isScanning ? <Loader2 className="w-4 h-4 text-black animate-spin" /> : <Zap className="w-4 h-4 fill-black text-black" />}
               {isScanning ? loadingText : "Search"}
