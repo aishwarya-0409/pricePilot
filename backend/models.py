@@ -44,6 +44,7 @@ class Product(Base):
     
     # Link to price history
     prices = relationship("PriceHistory", back_populates="product")
+    competitor_prices = relationship("PlatformPrice", back_populates="product")
 
 class PriceHistory(Base):
     __tablename__ = "price_history"
@@ -56,4 +57,14 @@ class PriceHistory(Base):
     # Link back to product
     product = relationship("Product", back_populates="prices")
 
-# Later we will add Product and Price tables here for the actual PricePilot logic!
+class PlatformPrice(Base):
+    __tablename__ = "platform_prices"
+
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    platform_name = Column(String, nullable=False)
+    price = Column(Float, nullable=False)
+    url = Column(String, nullable=False)
+    last_updated = Column(DateTime, default=datetime.utcnow)
+    
+    product = relationship("Product", back_populates="competitor_prices")

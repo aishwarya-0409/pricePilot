@@ -5,29 +5,35 @@ from pydantic import BaseModel
 import random
 
 from database import get_db
-from models import Product, PriceHistory
-from scraper import scrape_product
+from models import Product, PriceHistory, PlatformPrice
+from scraper import scrape_across_platforms
 from ml_engine import generate_prediction
 
 router = APIRouter(prefix="/api/products", tags=["Products & Predictions"])
 
 class ScrapeRequest(BaseModel):
-    url: str
+    query: str
 
 # --- Route 1: Scrape & Save (The Bridge between Real World and our App) ---
 @router.post("/scrape")
 def scrape_new_product(request: ScrapeRequest, db: Session = Depends(get_db)):
-    # 1. Scrape the live data
-    scraped_data = scrape_product(request.url)
+    # 1. Scrape the live data across platforms
+    scraped_data_list = scrape_across_platforms(request.query)
     
-    # 2. Check if we already scraped this exact name
-    product = db.query(Product).filter(Product.name == scraped_data["name"]).first()
+    if not scraped_data_list:
+        raise HTTPException(status_code=500, detail="Failed to find product data.")
+        
+    # Find the lowest price to represent the main tracking price
+    best_deal = min(scraped_data_list, key=lambda x: x["price"])
+    product_name = best_deal["title"]
+    
+    # 2. Check if we already scraped this name
+    product = db.query(Product).filter(Product.name == product_name).first()
     
     if not product:
-        # Create new product
         product = Product(
-            name=scraped_data["name"],
-            category=scraped_data["category"],
+            name=product_name,
+            category="Electronics",
             market_weather="Sunny" if random.random() > 0.5 else "Storm",
             market_mood="Volatile" if random.random() > 0.5 else "Stable"
         )
@@ -35,27 +41,38 @@ def scrape_new_product(request: ScrapeRequest, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(product)
         
-        # Because ML requires historical data, we backfill 30 days of fake history
-        # leading up to the REAL scraped price today.
-        real_price = scraped_data["current_price"]
+        # Backfill 30 days of fake history leading up to today
+        real_price = best_deal["price"]
         now = datetime.utcnow()
         history = []
         for i in range(30, -1, -1):
             date = now - timedelta(days=i)
-            # Add some variance, but make sure the final day equals the real price
-            if i == 0:
-                price = real_price
-            else:
-                price = real_price + random.randint(-5000, 5000)
+            price = real_price if i == 0 else real_price + random.randint(-5000, 5000)
             history.append(PriceHistory(product_id=product.id, price=price, timestamp=date))
         
         db.add_all(history)
         db.commit()
     else:
-        # If it exists, just append today's real scraped price
-        new_price = PriceHistory(product_id=product.id, price=scraped_data["current_price"], timestamp=datetime.utcnow())
+        new_price = PriceHistory(product_id=product.id, price=best_deal["price"], timestamp=datetime.utcnow())
         db.add(new_price)
         db.commit()
+
+    # 3. Update Platform Prices
+    # Clear old platform prices for this product to keep it fresh
+    db.query(PlatformPrice).filter(PlatformPrice.product_id == product.id).delete()
+    
+    platform_prices = []
+    for data in scraped_data_list:
+        platform_prices.append(
+            PlatformPrice(
+                product_id=product.id,
+                platform_name=data["platform"],
+                price=data["price"],
+                url=data["url"]
+            )
+        )
+    db.add_all(platform_prices)
+    db.commit()
 
     return {"message": "Scraped successfully", "product_id": product.id}
 
@@ -68,6 +85,7 @@ def get_product(product_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Product not found")
     
     latest_price = db.query(PriceHistory).filter(PriceHistory.product_id == product_id).order_by(PriceHistory.timestamp.desc()).first()
+    platform_prices = db.query(PlatformPrice).filter(PlatformPrice.product_id == product_id).all()
     
     return {
         "id": product.id,
@@ -75,7 +93,8 @@ def get_product(product_id: int, db: Session = Depends(get_db)):
         "category": product.category,
         "market_weather": product.market_weather,
         "market_mood": product.market_mood,
-        "current_price": latest_price.price if latest_price else 0
+        "current_price": latest_price.price if latest_price else 0,
+        "competitors": [{"platform": p.platform_name, "price": p.price, "url": p.url} for p in platform_prices]
     }
 
 # --- Route 3: Get Price History ---
@@ -100,7 +119,9 @@ def get_recommendation(product_id: int, db: Session = Depends(get_db)):
     dates = [p.timestamp for p in history]
     
     # Run the Scikit-Learn Linear Regression!
-    prediction_data = generate_prediction(prices, dates)
+    platform_prices = db.query(PlatformPrice).filter(PlatformPrice.product_id == product_id).all()
+    platform_data = [{"platform": p.platform_name, "price": p.price} for p in platform_prices]
+    prediction_data = generate_prediction(prices, dates, platform_prices=platform_data)
     
     return {
         "action": prediction_data["action"],

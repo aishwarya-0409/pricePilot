@@ -11,15 +11,23 @@ export default function Home() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isScanning, setIsScanning] = useState(false);
+  const [loadingText, setLoadingText] = useState("Scanning...");
 
   const handleScan = async () => {
     if (!searchQuery) return;
     
     setIsScanning(true);
+    setLoadingText("Scanning Amazon...");
+    
+    // Simulate intelligent loading states
+    setTimeout(() => setLoadingText("Scanning Flipkart..."), 3000);
+    setTimeout(() => setLoadingText("Comparing prices..."), 6000);
+    setTimeout(() => setLoadingText("Finding best deal..."), 9000);
+
     try {
-      // Send the URL to our new Python Scraper!
+      // Send the query to our new Python Scraper!
       const response = await axios.post("http://localhost:8000/api/products/scrape", {
-        url: searchQuery
+        query: searchQuery
       });
       
       // Navigate to the newly created product's Mission Control page
@@ -90,7 +98,7 @@ export default function Home() {
               className="absolute right-3 px-4 py-2.5 bg-white text-black font-semibold rounded-xl hover:bg-gray-200 disabled:opacity-50 transition-colors flex items-center gap-2"
             >
               {isScanning ? <Loader2 className="w-4 h-4 text-black animate-spin" /> : <Zap className="w-4 h-4 fill-black text-black" />}
-              {isScanning ? "Scanning..." : "Search"}
+              {isScanning ? loadingText : "Search"}
             </button>
           </div>
         </div>

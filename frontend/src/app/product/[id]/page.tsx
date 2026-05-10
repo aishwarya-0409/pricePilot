@@ -57,7 +57,7 @@ export default function ProductPage() {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-[var(--color-radar-border)] border-t-[var(--color-radar-accent)] rounded-full animate-spin glow-cyan" />
-          <p className="text-gray-400 font-mono tracking-widest text-sm uppercase">Establishing Connection...</p>
+          <p className="text-gray-400 font-mono tracking-widest text-sm uppercase">Analyzing Market...</p>
         </div>
       </div>
     );
@@ -91,7 +91,7 @@ export default function ProductPage() {
             className="bg-matte p-6 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden"
           >
             {/* Fake placeholder image for product */}
-            <div className="w-full aspect-square rounded-xl bg-gradient-to-br from-[#2a2a2a] to-[#111] mb-6 flex items-center justify-center border border-[var(--color-radar-border)]">
+            <div className="w-40 h-40 rounded-xl bg-gradient-to-br from-[#2a2a2a] to-[#111] mb-6 flex items-center justify-center border border-[var(--color-radar-border)]">
               <span className="text-6xl">📱</span>
             </div>
             <h1 className="text-2xl font-bold text-center mb-1">{product?.name}</h1>
@@ -99,7 +99,7 @@ export default function ProductPage() {
 
             <div className="w-full flex justify-between items-center p-4 bg-black/40 rounded-xl border border-[var(--color-radar-border)]">
               <div className="flex flex-col">
-                <span className="text-xs text-gray-500 uppercase tracking-widest mb-1">Market Mood</span>
+                <span className="text-xs text-gray-500 uppercase tracking-widest mb-1">Price Trend</span>
                 <span className={`font-semibold ${product?.market_mood === 'Volatile' ? 'text-[var(--color-radar-danger)]' : 'text-[var(--color-radar-accent)]'}`}>
                   {product?.market_mood}
                 </span>
@@ -107,6 +107,26 @@ export default function ProductPage() {
               {product?.market_weather === "Storm" ? <CloudLightning className="text-[var(--color-radar-danger)] w-8 h-8" /> : <ThermometerSun className="text-yellow-500 w-8 h-8" />}
             </div>
           </motion.div>
+
+          {/* New Market Comparison Module */}
+          {product?.competitors && product.competitors.length > 0 && (
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}
+              className="bg-matte p-6 rounded-2xl flex flex-col gap-4 border border-[var(--color-radar-border)]"
+            >
+              <h3 className="text-sm text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4" /> Live Market Prices
+              </h3>
+              <div className="flex flex-col gap-3">
+                {product.competitors.map((comp: any, idx: number) => (
+                  <a key={idx} href={comp.url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-3 bg-black/40 rounded-xl border border-gray-800 hover:border-[var(--color-radar-accent)] transition-colors group">
+                    <span className="font-medium text-gray-300 group-hover:text-white transition-colors">{comp.platform}</span>
+                    <span className="font-mono text-[var(--color-radar-accent)]">₹{comp.price.toLocaleString()}</span>
+                  </a>
+                ))}
+              </div>
+            </motion.div>
+          )}
         </div>
 
         {/* CENTER PANEL: The Cinematic Chart */}
@@ -179,15 +199,15 @@ export default function ProductPage() {
         <div className="lg:col-span-3 flex flex-col gap-6">
           <motion.div 
             initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
-            className="bg-matte p-6 rounded-2xl h-full border border-[var(--color-radar-border)]"
+            className="bg-matte p-6 rounded-2xl flex flex-col border border-[var(--color-radar-border)]"
           >
             <h3 className="text-sm text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2">
-              <Activity className="w-4 h-4" /> AI Diagnostics
+              <Activity className="w-4 h-4" /> Smart Advice
             </h3>
             
             <div className="space-y-4 mb-8">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Confidence Score</span>
+                <span className="text-gray-500">AI Certainty</span>
                 <span className="text-white font-mono">{recommendation?.confidence}%</span>
               </div>
               <div className="w-full h-1.5 bg-black rounded-full overflow-hidden">
@@ -196,6 +216,13 @@ export default function ProductPage() {
                   className={`h-full ${glowClass} ${isWait ? 'bg-[var(--color-radar-danger)]' : 'bg-[var(--color-radar-accent)]'}`} 
                 />
               </div>
+            </div>
+
+            {/* The Big Recommendation Reason */}
+            <div className={`p-4 rounded-xl mb-6 ${isWait ? 'bg-red-950/40 border border-red-900/50' : 'bg-[var(--color-radar-accent)]/10 border border-[var(--color-radar-accent)]/30'}`}>
+              <p className={`text-base font-semibold leading-relaxed ${isWait ? 'text-[var(--color-radar-danger)]' : 'text-[var(--color-radar-accent)]'}`}>
+                {recommendation?.reason}
+              </p>
             </div>
 
             <div className="font-mono text-xs text-gray-400 space-y-3">

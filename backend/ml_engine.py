@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.linear_model import LinearRegression
 from datetime import datetime, timedelta
 
-def generate_prediction(prices: list, dates: list):
+def generate_prediction(prices: list, dates: list, platform_prices: list = None):
     """
     Takes a list of historical prices and their corresponding datetime objects.
     Uses Scikit-Learn Linear Regression to predict the price 7 days into the future.
@@ -60,23 +60,40 @@ def generate_prediction(prices: list, dates: list):
     
     logs = []
     
-    # Logic based on the ML prediction
+    # Base ML Logic
     if price_drop < -100:
         action = "WAIT"
-        reason = f"ML Model predicts a price drop of ~₹{abs(round(price_drop))} over the next 7 days based on current trends."
         confidence = min(95, max(40, 100 - abs(int(trend)))) # Fake confidence metric based on variance
-        
-        logs.append("[✓] Scikit-Learn Linear Regression model deployed.")
-        logs.append(f"[✓] Negative trend detected (Slope: {round(trend, 2)}).")
-        logs.append(f"[-] Target buying price predicted: ₹{round(predicted_price)}")
+        logs.append("[✓] Analyzed recent price trends.")
+        logs.append(f"[✓] Prices are falling right now.")
+        logs.append(f"[-] Expected price next week: ₹{round(predicted_price)}")
     else:
         action = "BUY"
-        reason = "ML Model predicts prices will remain stable or increase. Secure it now."
         confidence = min(98, max(50, 80 + int(trend)))
+        logs.append("[✓] Analyzed recent price trends.")
+        logs.append(f"[✓] Prices are stable or rising.")
+        logs.append("[-] No big price drops expected soon.")
         
-        logs.append("[✓] Scikit-Learn Linear Regression model deployed.")
-        logs.append(f"[✓] Positive/Stable trend detected (Slope: {round(trend, 2)}).")
-        logs.append("[-] No significant drops predicted in the near future.")
+    # Cross-Platform Logic Integration
+    if platform_prices and len(platform_prices) > 0:
+        best_deal = min(platform_prices, key=lambda x: x["price"])
+        highest_deal = max(platform_prices, key=lambda x: x["price"])
+        diff = highest_deal["price"] - best_deal["price"]
+        
+        if diff > 0:
+            logs.append(f"[✓] Best deal found: {best_deal['platform']} is cheaper by ₹{diff}.")
+        else:
+            logs.append("[✓] Prices are the same across all stores.")
+            
+        if action == "WAIT":
+            reason = f"Hold off! Prices are dropping. When you're ready, {best_deal['platform']} has the best price at ₹{best_deal['price']}."
+        else:
+            reason = f"Buy now on {best_deal['platform']} for ₹{best_deal['price']}. Prices are likely to rise."
+    else:
+        if action == "WAIT":
+            reason = f"Wait it out! We expect the price to drop by roughly ₹{abs(round(price_drop))} next week."
+        else:
+            reason = "Prices look stable or might go up. It's a good time to buy."
 
     return {
         "action": action,
